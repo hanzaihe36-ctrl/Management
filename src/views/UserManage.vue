@@ -1,13 +1,11 @@
 <template>
   <div class="user-management">
-    <!-- 搜索条组件[cite: 2] -->
     <SearchBar
       :fields="searchFields"
       @search="handleSearch"
       @reset="handleReset"
     />
 
-    <!-- 核心操作与列表卡片 -->
     <el-card shadow="never" style="border: 1px solid #e4e7ed">
       <div style="margin-bottom: 16px; display: flex; gap: 10px">
         <el-button type="primary" @click="handleCreate">
@@ -22,7 +20,6 @@
         </el-button>
       </div>
 
-      <!-- 复用表格页面组件[cite: 2] -->
       <TablePage
         :columns="tableColumns"
         :data="pagedData"
@@ -33,14 +30,12 @@
         @page-change="onPageChange"
         @size-change="onSizeChange"
       >
-        <!-- 插槽：自定义渲染角色标签[cite: 2] -->
         <template #role="{ row }">
           <el-tag :type="row.role === 'admin' ? 'danger' : 'info'">
             {{ row.role === "admin" ? "管理员" : "普通成员" }}
           </el-tag>
         </template>
 
-        <!-- 插槽：自定义渲染状态标签[cite: 2] -->
         <template #status="{ row }">
           <el-tag
             :type="row.status === 'active' ? 'success' : 'warning'"
@@ -50,7 +45,10 @@
           </el-tag>
         </template>
 
-        <!-- 插槽：动态注入操作列动作[cite: 2] -->
+        <template #createTime="{ row }">
+          {{ new Date(row.createTime).toLocaleDateString() }}
+        </template>
+
         <template #actions="{ row }">
           <el-button type="primary" link size="small" @click="handleEdit(row)"
             >编辑</el-button
@@ -66,7 +64,6 @@
       </TablePage>
     </el-card>
 
-    <!-- 复用对话框表单组件[cite: 2] -->
     <FormDialog
       v-model:visible="dialogVisible"
       :title="dialogTitle"
@@ -74,7 +71,6 @@
       :rules="formRules"
       @submit="onFormSubmit"
     >
-      <!-- 利用作用域插槽向下注入具体的表单元素[cite: 2] -->
       <template #default="{ formData }">
         <el-form-item label="用户名" prop="username">
           <el-input
@@ -116,43 +112,57 @@ import TablePage from "../components/TablePage.vue";
 import FormDialog from "../components/FormDialog.vue";
 import { validateUsername, validatePhone } from "../utils/validate.js";
 
-// 1. 初始化 20 条以上用户测试数据[cite: 2]
 const userList = ref([]);
 const loading = ref(false);
 const selectedIds = ref([]);
 
-onMounted(() => {
-  const arr = [];
-  for (let i = 1; i <= 25; i++) {
-    arr.push({
-      id: 1000 + i,
-      username: `member_0${i}`,
-      email: `member${i}@ccnu.edu.cn`,
-      phone: `135123456${String(i).padStart(2, "0")}`,
-      role: i % 5 === 0 ? "admin" : "user",
-      status: i % 6 === 0 ? "inactive" : "active",
-    });
+// 从本地缓存同步或初始化高仿真Mock数据
+const initData = () => {
+  const localData = localStorage.getItem("CLUB_USERS");
+  if (localData) {
+    userList.value = JSON.parse(localData);
+  } else {
+    const arr = [];
+    const now = Date.now();
+    for (let i = 1; i <= 25; i++) {
+      arr.push({
+        id: 1000 + i,
+        username: `member_0${i}`,
+        email: `member${i}@ccnu.edu.cn`,
+        phone: `135123456${String(i).padStart(2, "0")}`,
+        role: i % i === 0 || i % 5 === 0 ? "admin" : "user",
+        status: i % i === 0 || i % 6 === 0 ? "inactive" : "active",
+        createTime: now - i * 3600000 * 24, // 递减模拟创建时间
+        lastLogin: now,
+      });
+    }
+    userList.value = arr;
+    updateLocalStorage();
   }
-  userList.value = arr;
+};
+
+const updateLocalStorage = () => {
+  localStorage.setItem("CLUB_USERS", JSON.stringify(userList.value));
+};
+
+onMounted(() => {
+  initData();
 });
 
-// 2. 搜索组件配置[cite: 2]
 const searchFields = [{ key: "keyword", label: "模糊查找", type: "input" }];
 const currentKeyword = ref("");
 
-// 3. 表格字段配置列[cite: 2]
 const tableColumns = [
   { prop: "username", label: "用户名", width: "130", sortable: true },
   { prop: "email", label: "电子邮箱" },
   { prop: "phone", label: "手机号", width: "140" },
   { prop: "role", label: "角色", width: "120" },
   { prop: "status", label: "状态", width: "100" },
+  { prop: "createTime", label: "入团时间", width: "150" },
 ];
 
-// 4. 分页控制核心指标[cite: 2]
 const pagination = reactive({ currentPage: 1, pageSize: 10, total: 0 });
 
-// 联动进行模糊查询匹配过滤
 const filteredData = computed(() => {
   if (!currentKeyword.value) return userList.value;
   const kw = currentKeyword.value.toLowerCase().trim();
@@ -163,7 +173,6 @@ const filteredData = computed(() => {
   );
 });
 
-// 分页数据截取展示[cite: 2]
 const pagedData = computed(() => {
   pagination.total = filteredData.value.length;
   const start = (pagination.currentPage - 1) * pagination.pageSize;
@@ -179,7 +188,6 @@ const handleReset = () => {
   pagination.currentPage = 1;
 };
 
-// 5. 增删改查核心弹窗控制逻辑[cite: 2]
 const dialogVisible = ref(false);
 const dialogTitle = ref("新增用户");
 const isEdit = ref(false);
@@ -192,7 +200,6 @@ const currentForm = ref({
   status: "active",
 });
 
-// 严格配置表单验证[cite: 2]
 const formRules = {
   username: [{ required: true, validator: validateUsername, trigger: "blur" }],
   email: [
@@ -230,20 +237,24 @@ const handleEdit = (row) => {
 
 const onFormSubmit = (data) => {
   if (isEdit.value) {
-    // 修改已有数据逻辑
     const idx = userList.value.findIndex((u) => u.id === data.id);
     if (idx !== -1) userList.value[idx] = { ...data };
     ElMessage.success("成员档案更新成功！");
   } else {
-    // 新增保存逻辑
-    const newMember = { ...data, id: Date.now() };
+    const newMember = {
+      ...data,
+      id: Date.now(),
+      createTime: Date.now(),
+      lastLogin: Date.now(),
+      isNewToday: true, // 打上今日新增标记
+    };
     userList.value.unshift(newMember);
     ElMessage.success("招新加入成功！");
   }
+  updateLocalStorage();
   dialogVisible.value = false;
 };
 
-// 6. 独立及批量移除逻辑（具备二次拦截）[cite: 2]
 const handleSingleDelete = (row) => {
   ElMessageBox.confirm(`确定要移除该社员（${row.username}）吗？`, "提示", {
     confirmButtonText: "确定",
@@ -252,6 +263,7 @@ const handleSingleDelete = (row) => {
   })
     .then(() => {
       userList.value = userList.value.filter((u) => u.id !== row.id);
+      updateLocalStorage();
       ElMessage.success("删除成功");
     })
     .catch(() => {});
@@ -276,6 +288,7 @@ const handleBatchDelete = () => {
         (u) => !selectedIds.value.includes(u.id),
       );
       selectedIds.value = [];
+      updateLocalStorage();
       ElMessage.success("批量删除完成");
     })
     .catch(() => {});
